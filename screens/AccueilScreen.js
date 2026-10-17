@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import {
-  View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet, StatusBar, Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
@@ -48,6 +48,11 @@ export default function AccueilScreen({ navigation }) {
       backgroundColor: colors.primaryLight,
       alignItems: 'center',
       justifyContent: 'center',
+      overflow: 'hidden', // ⚠️ Zidtha bach l'tswira t9ta3 f l'cercle
+    },
+    avatarImage: {
+      width: '100%',
+      height: '100%',
     },
 
     carteObjectif: {
@@ -148,7 +153,7 @@ export default function AccueilScreen({ navigation }) {
     >
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-      {/* En-tête b FadeIn */}
+      {/* En-tête */}
       <FadeInView delay={0}>
         <View style={styles.entete}>
           <View style={{ flex: 1 }}>
@@ -157,11 +162,21 @@ export default function AccueilScreen({ navigation }) {
             </Text>
             <Text style={styles.sousTitre}>Prêt à atteindre tes objectifs ?</Text>
           </View>
+          
+          {/* Avatar f l'korn (m3a Photo ila kayna) */}
           <TouchableOpacity
             style={styles.avatar}
             onPress={() => navigation.navigate('Profil')}
           >
-            <Ionicons name="person" size={22} color={colors.primary} />
+            {utilisateur?.photoUrl ? (
+              <Image
+                source={{ uri: utilisateur.photoUrl }}
+                style={styles.avatarImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <Ionicons name="person" size={22} color={colors.primary} />
+            )}
           </TouchableOpacity>
         </View>
       </FadeInView>
@@ -186,7 +201,7 @@ export default function AccueilScreen({ navigation }) {
         </View>
       </ScaleInView>
 
-      {/* 4 cartes b SlideUp (wa7ed wa7ed) */}
+      {/* 4 cartes b SlideUp */}
       <View style={styles.grille}>
         <View style={styles.rangee}>
           <SlideUpView delay={200} style={{ flex: 1 }}>

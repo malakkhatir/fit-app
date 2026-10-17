@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  StatusBar, Image, Vibration,
+  StatusBar, Image, Vibration, TextInput, Alert, ActivityIndicator,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAudioPlayer } from 'expo-audio';
 import { useTheme } from '../context/ThemeContext';
 import { useSeances } from '../context/SeancesContext';
+import { api } from '../services/api';
 import { radius, spacing } from '../theme/colors';
 import CircularProgress from '../components/CircularProgress';
 import { SlideUpView, ScaleInView } from '../components/AnimatedWrapper';
@@ -32,16 +34,36 @@ const INSTRUCTIONS_PAR_CATEGORIE = {
   ],
 };
 
+function formatDateComment(iso) {
+  const d = new Date(iso);
+  const now = new Date();
+  const diffMin = Math.floor((now - d) / 60000);
+  if (diffMin < 1) return "à l'instant";
+  if (diffMin < 60) return `il y a ${diffMin} min`;
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return `il y a ${diffH}h`;
+  const diffJ = Math.floor(diffH / 24);
+  if (diffJ < 7) return `il y a ${diffJ}j`;
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+}
+
 export default function DetailExerciceScreen({ route, navigation }) {
   const { exercice } = route.params;
   const { colors, isDark } = useTheme();
   const { estFavori, toggleFavori } = useSeances();
 
+  // Timer
   const [secondes, setSecondes] = useState(exercice.duree * 60);
   const [enCours, setEnCours] = useState(false);
   const [dureeInitiale, setDureeInitiale] = useState(exercice.duree * 60);
   const [vibrationActive, setVibrationActive] = useState(true);
   const [sonActive, setSonActive] = useState(true);
+
+  // Commentaires
+  const [comments, setComments] = useState([]);
+  const [nouveauCommentaire, setNouveauCommentaire] = useState('');
+  const [chargementComments, setChargementComments] = useState(true);
+  const [envoi, setEnvoi] = useState(false);
 
   const favori = estFavori(exercice.id);
 
@@ -55,6 +77,61 @@ export default function DetailExerciceScreen({ route, navigation }) {
       : INSTRUCTIONS_PAR_CATEGORIE[exercice.categorie] ||
         INSTRUCTIONS_PAR_CATEGORIE.Renforcement;
 
+  // ============ CHARGER COMMENTAIRES ============
+  useEffect(() => {
+    async function charger() {
+      try {
+        const data = await api.getComments(exercice.id);
+        setComments(data || []);
+      } catch (e) {
+        console.log('Erreur chargement commentaires:', e.message);
+      } finally {
+        setChargementComments(false);
+      }
+    }
+    charger();
+  }, [exercice.id]);
+
+  // ============ ENVOYER COMMENTAIRE ============
+  async function envoyerCommentaire() {
+    const texte = nouveauCommentaire.trim();
+    if (!texte) return;
+    setEnvoi(true);
+    try {
+      const nouveau = await api.addComment(exercice.id, texte);
+      setComments((prev) => [nouveau, ...prev]);
+      setNouveauCommentaire('');
+    } catch (e) {
+      Alert.alert('Erreur', e.message);
+    } finally {
+      setEnvoi(false);
+    }
+  }
+
+  // ============ SUPPRIMER COMMENTAIRE ============
+  function supprimerCommentaire(id) {
+    Alert.alert(
+      'Supprimer ce commentaire ?',
+      'Cette action est définitive.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await api.deleteComment(id);
+              setComments((prev) => prev.filter((c) => c.id !== id));
+            } catch (e) {
+              Alert.alert('Erreur', e.message);
+            }
+          },
+        },
+      ]
+    );
+  }
+
+  // ============ TIMER ============
   async function jouerSon() {
     if (!sonActive || !player) return;
     try {
@@ -105,10 +182,8 @@ export default function DetailExerciceScreen({ route, navigation }) {
   const styles = useMemo(() => StyleSheet.create({
     ecran: { flex: 1, backgroundColor: colors.background },
     imageContainer: {
-      height: 300,
-      position: 'relative',
-      backgroundColor: colors.navy,
-      overflow: 'hidden',
+      height: 300, position: 'relative',
+      backgroundColor: colors.navy, overflow: 'hidden',
     },
     imageBg: { width: '100%', height: '100%' },
     imagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
@@ -117,387 +192,444 @@ export default function DetailExerciceScreen({ route, navigation }) {
       backgroundColor: 'rgba(0,0,0,0.35)',
     },
     boutonRond: {
-      position: 'absolute',
-      top: 50,
-      width: 42,
-      height: 42,
-      borderRadius: 21,
+      position: 'absolute', top: 50,
+      width: 42, height: 42, borderRadius: 21,
       backgroundColor: 'rgba(0,0,0,0.5)',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 10,
+      alignItems: 'center', justifyContent: 'center', zIndex: 10,
     },
     categorieBadge: {
-      position: 'absolute',
-      bottom: 20,
-      left: 20,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
+      position: 'absolute', bottom: 20, left: 20,
+      flexDirection: 'row', alignItems: 'center', gap: 6,
       backgroundColor: 'rgba(37, 99, 235, 0.9)',
-      paddingHorizontal: spacing.md,
-      paddingVertical: 6,
+      paddingHorizontal: spacing.md, paddingVertical: 6,
       borderRadius: radius.round,
     },
     categorieBadgeTexte: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
     contenu: {
-      padding: spacing.lg,
-      marginTop: -spacing.xl,
+      padding: spacing.lg, marginTop: -spacing.xl,
       backgroundColor: colors.background,
-      borderTopLeftRadius: radius.xl,
-      borderTopRightRadius: radius.xl,
+      borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
       paddingBottom: spacing.xxl,
     },
     titre: {
-      fontSize: 26,
-      fontWeight: '900',
-      color: colors.textPrimary,
-      marginBottom: spacing.md,
+      fontSize: 26, fontWeight: '900',
+      color: colors.textPrimary, marginBottom: spacing.md,
     },
     badges: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
     badge: {
-      paddingHorizontal: spacing.md,
-      paddingVertical: 6,
+      paddingHorizontal: spacing.md, paddingVertical: 6,
       borderRadius: radius.round,
     },
     badgeTexte: { fontSize: 12, fontWeight: '700' },
     statsRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.card,
-      borderRadius: radius.lg,
-      padding: spacing.md,
-      marginBottom: spacing.lg,
+      flexDirection: 'row', alignItems: 'center',
+      backgroundColor: colors.card, borderRadius: radius.lg,
+      padding: spacing.md, marginBottom: spacing.lg,
     },
     statItem: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 6,
+      flex: 1, flexDirection: 'row',
+      alignItems: 'center', justifyContent: 'center', gap: 6,
     },
     statSeparateur: { width: 1, height: 24, backgroundColor: colors.border },
     statValeur: { color: colors.textPrimary, fontWeight: '700', fontSize: 13 },
     section: {
-      fontSize: 17,
-      fontWeight: '800',
-      color: colors.textPrimary,
-      marginTop: spacing.md,
-      marginBottom: spacing.sm,
+      fontSize: 17, fontWeight: '800', color: colors.textPrimary,
+      marginTop: spacing.md, marginBottom: spacing.sm,
     },
     texte: { color: colors.textSecondary, lineHeight: 22, fontSize: 14 },
     etape: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
+      flexDirection: 'row', alignItems: 'flex-start',
       marginBottom: spacing.md,
     },
     numero: {
-      width: 26,
-      height: 26,
-      borderRadius: 13,
+      width: 26, height: 26, borderRadius: 13,
       backgroundColor: colors.primary,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: spacing.md,
-      marginTop: 2,
+      alignItems: 'center', justifyContent: 'center',
+      marginRight: spacing.md, marginTop: 2,
     },
     numeroTexte: { color: '#FFFFFF', fontWeight: '800', fontSize: 13 },
     etapeTexte: {
-      flex: 1,
-      color: colors.textSecondary,
-      lineHeight: 22,
-      fontSize: 14,
+      flex: 1, color: colors.textSecondary,
+      lineHeight: 22, fontSize: 14,
     },
     minuteur: {
-      alignItems: 'center',
-      marginTop: spacing.xxl,
-      backgroundColor: colors.card,
-      padding: spacing.xl,
+      alignItems: 'center', marginTop: spacing.xxl,
+      backgroundColor: colors.card, padding: spacing.xl,
       borderRadius: radius.lg,
     },
     minuteurHeader: {
-      flexDirection: 'row',
-      width: '100%',
-      justifyContent: 'space-between',
-      alignItems: 'center',
+      flexDirection: 'row', width: '100%',
+      justifyContent: 'space-between', alignItems: 'center',
       marginBottom: spacing.md,
     },
     minuteurLabel: {
-      fontSize: 13,
-      color: colors.textMuted,
-      fontWeight: '700',
-      letterSpacing: 1,
-      textTransform: 'uppercase',
+      fontSize: 13, color: colors.textMuted, fontWeight: '700',
+      letterSpacing: 1, textTransform: 'uppercase',
     },
     minuteurHeaderButtons: { flexDirection: 'row', gap: 8 },
     iconeButton: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+      width: 36, height: 36, borderRadius: 18,
       backgroundColor: colors.backgroundAlt,
-      alignItems: 'center',
-      justifyContent: 'center',
+      alignItems: 'center', justifyContent: 'center',
     },
     minuteurTemps: {
-      fontSize: 42,
-      fontWeight: '900',
-      color: colors.textPrimary,
-      fontVariant: ['tabular-nums'],
+      fontSize: 42, fontWeight: '900',
+      color: colors.textPrimary, fontVariant: ['tabular-nums'],
     },
     minuteurStatus: {
-      fontSize: 12,
-      color: colors.textMuted,
-      marginTop: 4,
-      fontWeight: '600',
+      fontSize: 12, color: colors.textMuted,
+      marginTop: 4, fontWeight: '600',
     },
     presets: {
-      flexDirection: 'row',
-      gap: 8,
-      marginTop: spacing.lg,
-      marginBottom: spacing.lg,
-      flexWrap: 'wrap',
-      justifyContent: 'center',
+      flexDirection: 'row', gap: 8,
+      marginTop: spacing.lg, marginBottom: spacing.lg,
+      flexWrap: 'wrap', justifyContent: 'center',
     },
     presetButton: {
-      paddingHorizontal: 14,
-      paddingVertical: 8,
-      borderRadius: radius.round,
-      backgroundColor: colors.backgroundAlt,
-      borderWidth: 1,
-      borderColor: colors.border,
+      paddingHorizontal: 14, paddingVertical: 8,
+      borderRadius: radius.round, backgroundColor: colors.backgroundAlt,
+      borderWidth: 1, borderColor: colors.border,
     },
     presetTexte: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: colors.textSecondary,
+      fontSize: 12, fontWeight: '700', color: colors.textSecondary,
     },
     minuteurActions: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: spacing.md,
-      width: '100%',
+      flexDirection: 'row', alignItems: 'center',
+      gap: spacing.md, width: '100%',
     },
     boutonReset: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
+      width: 56, height: 56, borderRadius: 28,
       backgroundColor: colors.backgroundAlt,
-      alignItems: 'center',
-      justifyContent: 'center',
+      alignItems: 'center', justifyContent: 'center',
     },
     boutonMinuteur: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: spacing.sm,
+      flex: 1, flexDirection: 'row', alignItems: 'center',
+      justifyContent: 'center', gap: spacing.sm,
       backgroundColor: colors.primary,
-      paddingVertical: 18,
-      borderRadius: radius.md,
+      paddingVertical: 18, borderRadius: radius.md,
     },
     boutonMinuteurPause: { backgroundColor: colors.warning },
     boutonMinuteurTexte: { color: '#FFFFFF', fontWeight: '700', fontSize: 16 },
+
+    // ============ COMMENTAIRES ============
+    commentsSection: { marginTop: spacing.xxl },
+    commentsTitre: {
+      fontSize: 17, fontWeight: '800', color: colors.textPrimary,
+      marginBottom: spacing.md,
+    },
+    commentForm: {
+      flexDirection: 'row', alignItems: 'flex-end',
+      backgroundColor: colors.card, borderRadius: radius.lg,
+      padding: spacing.sm, marginBottom: spacing.md,
+      borderWidth: 1, borderColor: colors.border,
+    },
+    commentInput: {
+      flex: 1, paddingHorizontal: spacing.sm,
+      paddingVertical: 8, color: colors.textPrimary,
+      fontSize: 14, maxHeight: 100, minHeight: 40,
+    },
+    commentSendButton: {
+      width: 40, height: 40, borderRadius: 20,
+      backgroundColor: colors.primary,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    commentSendDisabled: { opacity: 0.5 },
+    commentVide: {
+      textAlign: 'center', color: colors.textMuted,
+      fontSize: 13, paddingVertical: spacing.lg,
+      fontStyle: 'italic',
+    },
+    commentLoading: { paddingVertical: spacing.lg, alignItems: 'center' },
+    commentCard: {
+      backgroundColor: colors.card,
+      borderRadius: radius.md,
+      padding: spacing.md,
+      marginBottom: spacing.sm,
+    },
+    commentHeader: {
+      flexDirection: 'row', alignItems: 'center',
+      marginBottom: spacing.sm, gap: spacing.sm,
+    },
+    commentAvatar: {
+      width: 32, height: 32, borderRadius: 16,
+      backgroundColor: colors.primaryLight,
+      alignItems: 'center', justifyContent: 'center',
+    },
+    commentAvatarText: {
+      color: colors.primary, fontWeight: '800', fontSize: 14,
+    },
+    commentInfos: { flex: 1 },
+    commentAuthor: {
+      fontSize: 13, fontWeight: '700', color: colors.textPrimary,
+    },
+    commentDate: {
+      fontSize: 11, color: colors.textMuted, marginTop: 1,
+    },
+    commentContent: {
+      color: colors.textSecondary, fontSize: 14,
+      lineHeight: 20, marginLeft: 40,
+    },
   }), [colors]);
 
   return (
     <View style={styles.ecran}>
       <StatusBar barStyle="light-content" />
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.imageContainer}>
-          {exercice.imageUrl ? (
-            <Image source={{ uri: exercice.imageUrl }} style={styles.imageBg} resizeMode="cover" />
-          ) : (
-            <View style={[styles.imageBg, styles.imagePlaceholder]}>
-              <Ionicons name="barbell" size={80} color="rgba(255,255,255,0.4)" />
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.imageContainer}>
+            {exercice.imageUrl ? (
+              <Image source={{ uri: exercice.imageUrl }} style={styles.imageBg} resizeMode="cover" />
+            ) : (
+              <View style={[styles.imageBg, styles.imagePlaceholder]}>
+                <Ionicons name="barbell" size={80} color="rgba(255,255,255,0.4)" />
+              </View>
+            )}
+            <View style={styles.imageOverlay} />
+
+            <TouchableOpacity
+              style={[styles.boutonRond, { left: 20 }]}
+              onPress={() => navigation.goBack()}
+            >
+              <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.boutonRond, { right: 20 }]}
+              onPress={() => toggleFavori(exercice.id)}
+            >
+              <Ionicons
+                name={favori ? 'heart' : 'heart-outline'}
+                size={22}
+                color={favori ? '#EF4444' : '#FFFFFF'}
+              />
+            </TouchableOpacity>
+
+            <View style={styles.categorieBadge}>
+              <Ionicons name="fitness" size={14} color="#FFFFFF" />
+              <Text style={styles.categorieBadgeTexte}>{exercice.categorie}</Text>
             </View>
-          )}
-          <View style={styles.imageOverlay} />
-
-          <TouchableOpacity
-            style={[styles.boutonRond, { left: 20 }]}
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
-          </TouchableOpacity>
-
-          {/* Bouton Favori — bddel m3a MySQL */}
-          <TouchableOpacity
-            style={[styles.boutonRond, { right: 20 }]}
-            onPress={() => toggleFavori(exercice.id)}
-          >
-            <Ionicons
-              name={favori ? 'heart' : 'heart-outline'}
-              size={22}
-              color={favori ? '#EF4444' : '#FFFFFF'}
-            />
-          </TouchableOpacity>
-
-          <View style={styles.categorieBadge}>
-            <Ionicons name="fitness" size={14} color="#FFFFFF" />
-            <Text style={styles.categorieBadgeTexte}>{exercice.categorie}</Text>
           </View>
-        </View>
 
-        <View style={styles.contenu}>
-          <SlideUpView delay={0}>
-            <Text style={styles.titre}>{exercice.nom}</Text>
-          </SlideUpView>
+          <View style={styles.contenu}>
+            <SlideUpView delay={0}>
+              <Text style={styles.titre}>{exercice.nom}</Text>
+            </SlideUpView>
 
-          <SlideUpView delay={80}>
-            <View style={styles.badges}>
-              <View style={[styles.badge, { backgroundColor: colors.primaryLight }]}>
-                <Text style={[styles.badgeTexte, { color: colors.primary }]}>
-                  {exercice.categorie}
-                </Text>
+            <SlideUpView delay={80}>
+              <View style={styles.badges}>
+                <View style={[styles.badge, { backgroundColor: colors.primaryLight }]}>
+                  <Text style={[styles.badgeTexte, { color: colors.primary }]}>
+                    {exercice.categorie}
+                  </Text>
+                </View>
+                <View style={[styles.badge, {
+                  backgroundColor:
+                    exercice.niveau === 'Débutant' ? (isDark ? '#14532D' : '#DCFCE7') :
+                    exercice.niveau === 'Intermédiaire' ? (isDark ? '#78350F' : '#FEF3C7') :
+                    (isDark ? '#7F1D1D' : '#FEE2E2'),
+                }]}>
+                  <Text style={[styles.badgeTexte, {
+                    color:
+                      exercice.niveau === 'Débutant' ? (isDark ? '#4ADE80' : '#22C55E') :
+                      exercice.niveau === 'Intermédiaire' ? (isDark ? '#FBBF24' : '#F59E0B') :
+                      (isDark ? '#F87171' : '#EF4444'),
+                  }]}>
+                    {exercice.niveau}
+                  </Text>
+                </View>
               </View>
-              <View
-                style={[
-                  styles.badge,
-                  {
-                    backgroundColor:
-                      exercice.niveau === 'Débutant'
-                        ? isDark ? '#14532D' : '#DCFCE7'
-                        : exercice.niveau === 'Intermédiaire'
-                        ? isDark ? '#78350F' : '#FEF3C7'
-                        : isDark ? '#7F1D1D' : '#FEE2E2',
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.badgeTexte,
-                    {
-                      color:
-                        exercice.niveau === 'Débutant'
-                          ? isDark ? '#4ADE80' : '#22C55E'
-                          : exercice.niveau === 'Intermédiaire'
-                          ? isDark ? '#FBBF24' : '#F59E0B'
-                          : isDark ? '#F87171' : '#EF4444',
-                    },
-                  ]}
+            </SlideUpView>
+
+            <SlideUpView delay={150}>
+              <View style={styles.statsRow}>
+                <View style={styles.statItem}>
+                  <Ionicons name="time-outline" size={20} color={colors.primary} />
+                  <Text style={styles.statValeur}>{exercice.duree} min</Text>
+                </View>
+                <View style={styles.statSeparateur} />
+                <View style={styles.statItem}>
+                  <Ionicons name="repeat-outline" size={20} color={colors.primary} />
+                  <Text style={styles.statValeur}>{exercice.repetitions}</Text>
+                </View>
+              </View>
+            </SlideUpView>
+
+            <SlideUpView delay={220}>
+              <Text style={styles.section}>Description</Text>
+              <Text style={styles.texte}>{exercice.description}</Text>
+            </SlideUpView>
+
+            <SlideUpView delay={300}>
+              <Text style={styles.section}>Instructions</Text>
+              {instructions.map((etape, i) => (
+                <View key={i} style={styles.etape}>
+                  <View style={styles.numero}>
+                    <Text style={styles.numeroTexte}>{i + 1}</Text>
+                  </View>
+                  <Text style={styles.etapeTexte}>{etape}</Text>
+                </View>
+              ))}
+            </SlideUpView>
+
+            <ScaleInView delay={400}>
+              <View style={styles.minuteur}>
+                <View style={styles.minuteurHeader}>
+                  <Text style={styles.minuteurLabel}>Minuteur</Text>
+                  <View style={styles.minuteurHeaderButtons}>
+                    <TouchableOpacity
+                      style={styles.iconeButton}
+                      onPress={() => setSonActive((s) => !s)}
+                    >
+                      <Ionicons
+                        name={sonActive ? 'volume-high' : 'volume-mute'}
+                        size={20} color={colors.textSecondary}
+                      />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.iconeButton}
+                      onPress={() => setVibrationActive((v) => !v)}
+                    >
+                      <Ionicons
+                        name={vibrationActive ? 'phone-portrait' : 'phone-portrait-outline'}
+                        size={20} color={colors.textSecondary}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                <CircularProgress
+                  taille={220} epaisseur={16}
+                  valeur={dureeInitiale - secondes} max={dureeInitiale}
+                  couleur={enCours ? colors.primary : colors.textMuted}
+                  couleurFond={colors.primaryLight}
                 >
-                  {exercice.niveau}
-                </Text>
-              </View>
-            </View>
-          </SlideUpView>
+                  <Text style={styles.minuteurTemps}>{formatTemps(secondes)}</Text>
+                  <Text style={styles.minuteurStatus}>
+                    {enCours ? 'En cours...' : secondes === 0 ? 'Terminé !' : 'Prêt'}
+                  </Text>
+                </CircularProgress>
 
-          <SlideUpView delay={150}>
-            <View style={styles.statsRow}>
-              <View style={styles.statItem}>
-                <Ionicons name="time-outline" size={20} color={colors.primary} />
-                <Text style={styles.statValeur}>{exercice.duree} min</Text>
-              </View>
-              <View style={styles.statSeparateur} />
-              <View style={styles.statItem}>
-                <Ionicons name="repeat-outline" size={20} color={colors.primary} />
-                <Text style={styles.statValeur}>{exercice.repetitions}</Text>
-              </View>
-            </View>
-          </SlideUpView>
-
-          <SlideUpView delay={220}>
-            <Text style={styles.section}>Description</Text>
-            <Text style={styles.texte}>{exercice.description}</Text>
-          </SlideUpView>
-
-          <SlideUpView delay={300}>
-            <Text style={styles.section}>Instructions</Text>
-            {instructions.map((etape, i) => (
-              <View key={i} style={styles.etape}>
-                <View style={styles.numero}>
-                  <Text style={styles.numeroTexte}>{i + 1}</Text>
+                <View style={styles.presets}>
+                  {[30, 60, 120, 300].map((d) => (
+                    <TouchableOpacity
+                      key={d}
+                      style={styles.presetButton}
+                      onPress={() => {
+                        setEnCours(false);
+                        setSecondes(d);
+                        setDureeInitiale(d);
+                      }}
+                    >
+                      <Text style={styles.presetTexte}>
+                        {d < 60 ? `${d}s` : `${d / 60}min`}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
-                <Text style={styles.etapeTexte}>{etape}</Text>
-              </View>
-            ))}
-          </SlideUpView>
 
-          <ScaleInView delay={400}>
-            <View style={styles.minuteur}>
-              <View style={styles.minuteurHeader}>
-                <Text style={styles.minuteurLabel}>Minuteur</Text>
-                <View style={styles.minuteurHeaderButtons}>
+                <View style={styles.minuteurActions}>
+                  <TouchableOpacity style={styles.boutonReset} onPress={reset}>
+                    <Ionicons name="refresh" size={20} color={colors.textSecondary} />
+                  </TouchableOpacity>
                   <TouchableOpacity
-                    style={styles.iconeButton}
-                    onPress={() => setSonActive((s) => !s)}
+                    style={[styles.boutonMinuteur, enCours && styles.boutonMinuteurPause]}
+                    onPress={demarrer}
+                    activeOpacity={0.85}
                   >
                     <Ionicons
-                      name={sonActive ? 'volume-high' : 'volume-mute'}
-                      size={20}
-                      color={colors.textSecondary}
+                      name={enCours ? 'pause' : 'play'}
+                      size={24} color="#FFFFFF"
                     />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.iconeButton}
-                    onPress={() => setVibrationActive((v) => !v)}
-                  >
-                    <Ionicons
-                      name={vibrationActive ? 'phone-portrait' : 'phone-portrait-outline'}
-                      size={20}
-                      color={colors.textSecondary}
-                    />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <CircularProgress
-                taille={220}
-                epaisseur={16}
-                valeur={dureeInitiale - secondes}
-                max={dureeInitiale}
-                couleur={enCours ? colors.primary : colors.textMuted}
-                couleurFond={colors.primaryLight}
-              >
-                <Text style={styles.minuteurTemps}>{formatTemps(secondes)}</Text>
-                <Text style={styles.minuteurStatus}>
-                  {enCours ? 'En cours...' : secondes === 0 ? 'Terminé !' : 'Prêt'}
-                </Text>
-              </CircularProgress>
-
-              <View style={styles.presets}>
-                {[30, 60, 120, 300].map((d) => (
-                  <TouchableOpacity
-                    key={d}
-                    style={styles.presetButton}
-                    onPress={() => {
-                      setEnCours(false);
-                      setSecondes(d);
-                      setDureeInitiale(d);
-                    }}
-                  >
-                    <Text style={styles.presetTexte}>
-                      {d < 60 ? `${d}s` : `${d / 60}min`}
+                    <Text style={styles.boutonMinuteurTexte}>
+                      {enCours ? 'Pause' : secondes === 0 ? 'Recommencer' : 'Démarrer'}
                     </Text>
                   </TouchableOpacity>
-                ))}
+                </View>
               </View>
+            </ScaleInView>
 
-              <View style={styles.minuteurActions}>
-                <TouchableOpacity style={styles.boutonReset} onPress={reset}>
-                  <Ionicons name="refresh" size={20} color={colors.textSecondary} />
-                </TouchableOpacity>
+            {/* ============ COMMENTAIRES ============ */}
+            <SlideUpView delay={500}>
+              <View style={styles.commentsSection}>
+                <Text style={styles.commentsTitre}>
+                  Commentaires ({comments.length})
+                </Text>
 
-                <TouchableOpacity
-                  style={[styles.boutonMinuteur, enCours && styles.boutonMinuteurPause]}
-                  onPress={demarrer}
-                  activeOpacity={0.85}
-                >
-                  <Ionicons
-                    name={enCours ? 'pause' : 'play'}
-                    size={24}
-                    color="#FFFFFF"
+                {/* Formulaire */}
+                <View style={styles.commentForm}>
+                  <TextInput
+                    style={styles.commentInput}
+                    placeholder="Écris un commentaire..."
+                    placeholderTextColor={colors.textMuted}
+                    value={nouveauCommentaire}
+                    onChangeText={setNouveauCommentaire}
+                    multiline
+                    maxLength={1000}
                   />
-                  <Text style={styles.boutonMinuteurTexte}>
-                    {enCours ? 'Pause' : secondes === 0 ? 'Recommencer' : 'Démarrer'}
+                  <TouchableOpacity
+                    style={[
+                      styles.commentSendButton,
+                      (envoi || !nouveauCommentaire.trim()) && styles.commentSendDisabled,
+                    ]}
+                    onPress={envoyerCommentaire}
+                    disabled={envoi || !nouveauCommentaire.trim()}
+                  >
+                    {envoi ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <Ionicons name="send" size={18} color="#FFFFFF" />
+                    )}
+                  </TouchableOpacity>
+                </View>
+
+                {/* Liste */}
+                {chargementComments ? (
+                  <View style={styles.commentLoading}>
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  </View>
+                ) : comments.length === 0 ? (
+                  <Text style={styles.commentVide}>
+                    Aucun commentaire. Sois le premier à donner ton avis ! 💬
                   </Text>
-                </TouchableOpacity>
+                ) : (
+                  comments.map((c) => (
+                    <View key={c.id} style={styles.commentCard}>
+                      <View style={styles.commentHeader}>
+                        <View style={styles.commentAvatar}>
+                          <Text style={styles.commentAvatarText}>
+                            {(c.prenom?.[0] || '?').toUpperCase()}
+                          </Text>
+                        </View>
+                        <View style={styles.commentInfos}>
+                          <Text style={styles.commentAuthor}>{c.prenom}</Text>
+                          <Text style={styles.commentDate}>
+                            {formatDateComment(c.created_at)}
+                          </Text>
+                        </View>
+                        {c.isMine && (
+                          <TouchableOpacity
+                            onPress={() => supprimerCommentaire(c.id)}
+                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                          >
+                            <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                      <Text style={styles.commentContent}>{c.content}</Text>
+                    </View>
+                  ))
+                )}
               </View>
-            </View>
-          </ScaleInView>
-        </View>
-      </ScrollView>
+            </SlideUpView>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }

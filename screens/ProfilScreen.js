@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  StatusBar, Switch, Alert, TextInput, Image, FlatList,
+  StatusBar, Switch, Alert, TextInput, Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useSeances } from '../context/SeancesContext';
+import GrilleBadges from '../components/GrilleBadges';
 import { radius, spacing, shadow } from '../theme/colors';
 
 function LigneParametre({ icone, titre, sousTitre, onPress, right, colors }) {
@@ -59,29 +61,56 @@ function LigneParametre({ icone, titre, sousTitre, onPress, right, colors }) {
 }
 
 export default function ProfilScreen({ navigation }) {
-  const { utilisateur, deconnecter, mettreAJourProfil } = useAuth();
+  const { utilisateur, deconnecter, mettreAJourProfil, mettreAJourPhoto } = useAuth();
   const { isDark, toggleTheme, colors } = useTheme();
-  const { favoris, exercices } = useSeances();
+  const { favoris, exercices, badges, statsBadges } = useSeances();
 
   const [notifications, setNotifications] = useState(true);
   const [edition, setEdition] = useState(false);
   const [prenom, setPrenom] = useState('');
   const [objectif, setObjectif] = useState('3');
 
-  // Exercices favoris (trouve les infos dial kol id)
+  // Exercices favoris
   const exercicesFavoris = useMemo(() => {
     return favoris
       .map((id) => exercices.find((e) => Number(e.id) === Number(id)))
       .filter(Boolean);
   }, [favoris, exercices]);
 
-  // Synchro l'champ m3a l'user
+  // Synchro champs
   useEffect(() => {
     if (utilisateur) {
       setPrenom(utilisateur.prenom ?? '');
       setObjectif(String(utilisateur.objectifHebdo ?? 3));
     }
   }, [utilisateur]);
+
+  // ============================================
+  // CHANGER PHOTO DE PROFIL
+  // ============================================
+  async function changerPhoto() {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission refusée', 'On a besoin d\'accéder à tes photos.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1], // Format carré
+      quality: 0.5,   // Compresser
+    });
+
+    if (!result.canceled && result.assets[0].uri) {
+      try {
+        await mettreAJourPhoto(result.assets[0].uri);
+        Alert.alert('Succès', 'Photo de profil mise à jour !');
+      } catch (e) {
+        Alert.alert('Erreur', e.message);
+      }
+    }
+  }
 
   const styles = useMemo(() => StyleSheet.create({
     ecran: { flex: 1, backgroundColor: colors.background },
@@ -91,6 +120,10 @@ export default function ProfilScreen({ navigation }) {
       alignItems: 'center',
       marginBottom: spacing.xxl,
     },
+    avatarContainer: {
+      position: 'relative',
+      marginBottom: spacing.md,
+    },
     avatar: {
       width: 90,
       height: 90,
@@ -98,7 +131,25 @@ export default function ProfilScreen({ navigation }) {
       backgroundColor: colors.primaryLight,
       alignItems: 'center',
       justifyContent: 'center',
-      marginBottom: spacing.md,
+      overflow: 'hidden',
+    },
+    imageAvatar: {
+      width: 90,
+      height: 90,
+      borderRadius: 45,
+    },
+    cameraIcon: {
+      position: 'absolute',
+      bottom: 0,
+      right: 0,
+      backgroundColor: colors.primary,
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 3,
+      borderColor: colors.background,
     },
     nom: { fontSize: 20, fontWeight: '900', color: colors.textPrimary },
     email: { fontSize: 13, color: colors.textSecondary, marginTop: 4 },
@@ -117,7 +168,7 @@ export default function ProfilScreen({ navigation }) {
       alignItems: 'center',
     },
     statRapideValeur: {
-      fontSize: 22,
+      fontSize: 20,
       fontWeight: '900',
       color: colors.primary,
     },
@@ -126,6 +177,7 @@ export default function ProfilScreen({ navigation }) {
       color: colors.textSecondary,
       marginTop: 4,
       fontWeight: '600',
+      textAlign: 'center',
     },
     statRapideSeparateur: {
       width: 1,
@@ -187,10 +239,26 @@ export default function ProfilScreen({ navigation }) {
     texteAnnuler: { color: colors.textSecondary, fontWeight: '700' },
     texteValider: { color: colors.white, fontWeight: '700' },
 
-    // ===== FAVORIS =====
-    favorisContainer: {
-      marginBottom: spacing.xl,
+    // BADGES
+    badgesContainer: { marginBottom: spacing.xl },
+    badgesHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: spacing.sm,
     },
+    badgesCompteur: {
+      fontSize: 12,
+      color: '#F59E0B',
+      fontWeight: '700',
+    },
+    badgesGrille: {
+      marginHorizontal: -spacing.lg,
+      paddingHorizontal: spacing.lg,
+    },
+
+    // FAVORIS
+    favorisContainer: { marginBottom: spacing.xl },
     favorisHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
@@ -300,11 +368,27 @@ export default function ProfilScreen({ navigation }) {
     >
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
-      {/* Avatar + infos */}
+      {/* ========== EN-TÊTE ========== */}
       <View style={styles.profilEntete}>
-        <View style={styles.avatar}>
-          <Ionicons name="person" size={40} color={colors.primary} />
-        </View>
+        {/* Avatar b Photo */}
+        <TouchableOpacity style={styles.avatarContainer} onPress={changerPhoto}>
+          <View style={styles.avatar}>
+            {utilisateur?.photoUrl ? (
+              <Image
+                source={{ uri: utilisateur.photoUrl }}
+                style={styles.imageAvatar}
+                resizeMode="cover"
+              />
+            ) : (
+              <Ionicons name="person" size={40} color={colors.primary} />
+            )}
+          </View>
+          {/* Caméra icon f l'korn */}
+          <View style={styles.cameraIcon}>
+            <Ionicons name="camera" size={14} color="#FFFFFF" />
+          </View>
+        </TouchableOpacity>
+
         <Text style={styles.nom}>{utilisateur?.prenom || 'Invité'}</Text>
         <Text style={styles.email}>{utilisateur?.email ?? 'email@exemple.com'}</Text>
       </View>
@@ -317,13 +401,33 @@ export default function ProfilScreen({ navigation }) {
         </View>
         <View style={styles.statRapideSeparateur} />
         <View style={styles.statRapide}>
-          <Text style={styles.statRapideValeur}>{utilisateur?.objectifHebdo ?? 3}</Text>
-          <Text style={styles.statRapideLabel}>Objectif/sem.</Text>
+          <Text style={styles.statRapideValeur}>
+            {statsBadges?.nombreDebloques ?? 0}
+          </Text>
+          <Text style={styles.statRapideLabel}>Badges</Text>
         </View>
         <View style={styles.statRapideSeparateur} />
         <View style={styles.statRapide}>
-          <Text style={styles.statRapideValeur}>🔥</Text>
-          <Text style={styles.statRapideLabel}>Actif</Text>
+          <Text style={styles.statRapideValeur}>
+            🔥 {statsBadges?.streak ?? 0}
+          </Text>
+          <Text style={styles.statRapideLabel}>Jours</Text>
+        </View>
+      </View>
+
+      {/* ========== BADGES ========== */}
+      <View style={styles.badgesContainer}>
+        <View style={styles.badgesHeader}>
+          <Text style={styles.sectionTitre}>Mes badges</Text>
+          {statsBadges && (
+            <Text style={styles.badgesCompteur}>
+              {statsBadges.nombreDebloques} / {statsBadges.totalBadges} débloqués
+            </Text>
+          )}
+        </View>
+
+        <View style={styles.badgesGrille}>
+          <GrilleBadges badges={badges} />
         </View>
       </View>
 
@@ -379,7 +483,7 @@ export default function ProfilScreen({ navigation }) {
         )}
       </View>
 
-      {/* Édition du profil */}
+      {/* ========== MES INFORMATIONS ========== */}
       <View style={styles.section}>
         <Text style={styles.sectionTitre}>Mes informations</Text>
 
@@ -428,7 +532,7 @@ export default function ProfilScreen({ navigation }) {
         )}
       </View>
 
-      {/* Paramètres */}
+      {/* ========== PARAMÈTRES ========== */}
       <View style={styles.section}>
         <Text style={styles.sectionTitre}>Paramètres</Text>
 
@@ -475,13 +579,13 @@ export default function ProfilScreen({ navigation }) {
         />
       </View>
 
-      {/* Aide */}
+      {/* ========== AIDE ========== */}
       <View style={styles.section}>
         <LigneParametre colors={colors} icone="help-circle-outline" titre="Aide" />
         <LigneParametre colors={colors} icone="information-circle-outline" titre="À propos" />
       </View>
 
-      {/* Déconnexion */}
+      {/* ========== DÉCONNEXION ========== */}
       <TouchableOpacity
         style={styles.boutonDeconnexion}
         onPress={confirmerDeconnexion}

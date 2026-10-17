@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system/legacy'; // Khass tkon 'legacy' bach ma ytla3ch warning akhor
 
-// ⚠️ REMPLACE par ton IP locale (trouvée avec `ipconfig`)
+// ⚠️ REMPLACE par ton IP locale
 export const API_URL = 'http://192.168.51.52/fitapp-backend/api';
 
 const CLE_TOKEN = 'fitapp_token';
@@ -43,9 +44,7 @@ async function request(path, { method = 'GET', body, auth = false } = {}) {
     throw new Error(`Réponse invalide du serveur (code ${reponse.status}).`);
   }
 
-  // ⚠️ Bloc wa7ed bo7do — ILA 401 → nettoyage + erreur
   if (!reponse.ok) {
-    // Token mchi valide → kat-sse7b mn AsyncStorage
     if (reponse.status === 401) {
       await setToken(null);
       await AsyncStorage.removeItem(CLE_USER);
@@ -85,7 +84,43 @@ export const api = {
       method: 'DELETE',
       auth: true,
     }),
-    getFavorites:() => request('/favorites.php',{ auth: true }),
-    addFavorite:(id) => request('/favorites.php',{ method: 'POST',   body: { exerciseId: id }, auth: true }),
-    removeFavorite:(id) => request(`/favorites.php?exerciseId=${id}`, { method: 'DELETE', auth: true }),
+
+  // FAVORIS
+  getFavorites:   ()   => request('/favorites.php', { auth: true }),
+  addFavorite:    (id) => request('/favorites.php', { method: 'POST', body: { exerciseId: id }, auth: true }),
+  removeFavorite: (id) => request(`/favorites.php?exerciseId=${id}`, { method: 'DELETE', auth: true }),
+
+  // COMMENTAIRES
+  getComments:   (exerciseId)      => request(`/comments.php?exerciseId=${exerciseId}`, { auth: true }),
+  addComment:    (exerciseId, txt) => request('/comments.php', { method: 'POST', body: { exerciseId, content: txt }, auth: true }),
+  deleteComment: (id)              => request(`/comments.php?id=${id}`, { method: 'DELETE', auth: true }),
+
+  // BADGES
+  getBadges: () => request('/badges.php', { auth: true }),
+
+  // UPLOAD AVATAR (Version wa7da bo7dha - NATIVE - Sans Blob)
+  uploadAvatar: async (imageUri) => {
+    const token = await getToken();
+    
+    const uploadResult = await FileSystem.uploadAsync(
+      `${API_URL}/upload-avatar.php`,
+      imageUri,
+      {
+        httpMethod: 'POST',
+        uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+        fieldName: 'avatar',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      }
+    );
+
+    const data = JSON.parse(uploadResult.body);
+    
+    if (uploadResult.status < 200 || uploadResult.status >= 300) {
+      throw new Error(data.erreur || 'Erreur upload');
+    }
+    
+    return data;
+  },
 };

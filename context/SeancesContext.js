@@ -9,6 +9,8 @@ export function SeancesProvider({ children }) {
   const [programmes, setProgrammes] = useState([]);
   const [progressions, setProgressions] = useState({});
   const [favoris, setFavoris] = useState([]);
+  const [badges, setBadges] = useState([]);
+  const [statsBadges, setStatsBadges] = useState(null);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState(null);
 
@@ -79,6 +81,18 @@ export function SeancesProvider({ children }) {
           console.log('>>> [SeancesContext] Favoris échoué:', e.message);
           setFavoris([]);
         }
+
+        // 5) Badges
+        try {
+          const data = await api.getBadges();
+          setBadges(data.badges || []);
+          setStatsBadges(data.stats || null);
+          console.log('>>> [SeancesContext] Badges chargés:', data.badges?.length);
+        } catch (e) {
+          console.log('>>> [SeancesContext] Badges échoué:', e.message);
+          setBadges([]);
+          setStatsBadges(null);
+        }
       } catch (e) {
         console.log('>>> [SeancesContext] ERREUR:', e.message);
         setErreur(e.message);
@@ -111,6 +125,9 @@ export function SeancesProvider({ children }) {
         minutes: programme.duree,
       });
       setSeances((prev) => prev.map((s) => (s.id === tempId ? reelle : s)));
+
+      // Recharge badges en arrière-plan
+      rechargerBadges().catch(() => {});
     } catch (e) {
       setSeances((prev) => prev.filter((s) => s.id !== tempId));
       throw e;
@@ -122,6 +139,7 @@ export function SeancesProvider({ children }) {
     setSeances((prev) => prev.filter((s) => s.id !== id));
     try {
       await api.deleteSession(id);
+      rechargerBadges().catch(() => {});
     } catch (e) {
       setSeances(sauvegarde);
       throw e;
@@ -133,6 +151,7 @@ export function SeancesProvider({ children }) {
     setSeances([]);
     try {
       await Promise.all(ids.map((id) => api.deleteSession(id)));
+      rechargerBadges().catch(() => {});
     } catch (e) {
       const serveur = await api.getSessions();
       setSeances(serveur);
@@ -191,7 +210,6 @@ export function SeancesProvider({ children }) {
     const id = Number(exerciseId);
     const dejaFavori = favoris.includes(id);
 
-    // Optimistic update
     setFavoris((prev) =>
       dejaFavori ? prev.filter((f) => f !== id) : [...prev, id]
     );
@@ -202,11 +220,27 @@ export function SeancesProvider({ children }) {
       } else {
         await api.addFavorite(id);
       }
+      // Recharge badges (favoris affectent "Collectionneur")
+      rechargerBadges().catch(() => {});
     } catch (e) {
-      // Rollback
       setFavoris((prev) =>
         dejaFavori ? [...prev, id] : prev.filter((f) => f !== id)
       );
+      throw e;
+    }
+  }
+
+  // ============================================
+  // BADGES
+  // ============================================
+  async function rechargerBadges() {
+    try {
+      const data = await api.getBadges();
+      setBadges(data.badges || []);
+      setStatsBadges(data.stats || null);
+      return data;
+    } catch (e) {
+      console.log('>>> Erreur rechargement badges:', e.message);
       throw e;
     }
   }
@@ -222,6 +256,8 @@ export function SeancesProvider({ children }) {
         programmes,
         progressions,
         favoris,
+        badges,
+        statsBadges,
         chargement,
         erreur,
         terminerSeance,
@@ -232,6 +268,7 @@ export function SeancesProvider({ children }) {
         getProgressionProgramme,
         estFavori,
         toggleFavori,
+        rechargerBadges,
       }}
     >
       {children}
