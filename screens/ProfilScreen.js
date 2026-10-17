@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  StatusBar, Switch, Alert, TextInput,
+  StatusBar, Switch, Alert, TextInput, Image, FlatList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { radius, spacing } from '../theme/colors';
+import { useSeances } from '../context/SeancesContext';
+import { radius, spacing, shadow } from '../theme/colors';
 
 function LigneParametre({ icone, titre, sousTitre, onPress, right, colors }) {
   const styles = useMemo(() => StyleSheet.create({
@@ -60,11 +61,19 @@ function LigneParametre({ icone, titre, sousTitre, onPress, right, colors }) {
 export default function ProfilScreen({ navigation }) {
   const { utilisateur, deconnecter, mettreAJourProfil } = useAuth();
   const { isDark, toggleTheme, colors } = useTheme();
+  const { favoris, exercices } = useSeances();
 
   const [notifications, setNotifications] = useState(true);
   const [edition, setEdition] = useState(false);
   const [prenom, setPrenom] = useState('');
   const [objectif, setObjectif] = useState('3');
+
+  // Exercices favoris (trouve les infos dial kol id)
+  const exercicesFavoris = useMemo(() => {
+    return favoris
+      .map((id) => exercices.find((e) => Number(e.id) === Number(id)))
+      .filter(Boolean);
+  }, [favoris, exercices]);
 
   // Synchro l'champ m3a l'user
   useEffect(() => {
@@ -74,7 +83,6 @@ export default function ProfilScreen({ navigation }) {
     }
   }, [utilisateur]);
 
-  // ⚠️ Styles DYNAMIC (kaybdelo m3a l'thème)
   const styles = useMemo(() => StyleSheet.create({
     ecran: { flex: 1, backgroundColor: colors.background },
     contenu: { padding: spacing.lg, paddingTop: 60, paddingBottom: 40 },
@@ -94,6 +102,36 @@ export default function ProfilScreen({ navigation }) {
     },
     nom: { fontSize: 20, fontWeight: '900', color: colors.textPrimary },
     email: { fontSize: 13, color: colors.textSecondary, marginTop: 4 },
+
+    // Stats rapides
+    statsRapides: {
+      flexDirection: 'row',
+      backgroundColor: colors.card,
+      borderRadius: radius.lg,
+      padding: spacing.lg,
+      marginBottom: spacing.xl,
+      ...shadow.sm,
+    },
+    statRapide: {
+      flex: 1,
+      alignItems: 'center',
+    },
+    statRapideValeur: {
+      fontSize: 22,
+      fontWeight: '900',
+      color: colors.primary,
+    },
+    statRapideLabel: {
+      fontSize: 11,
+      color: colors.textSecondary,
+      marginTop: 4,
+      fontWeight: '600',
+    },
+    statRapideSeparateur: {
+      width: 1,
+      backgroundColor: colors.border,
+      marginVertical: spacing.xs,
+    },
 
     section: { marginBottom: spacing.xl },
     sectionTitre: {
@@ -149,6 +187,69 @@ export default function ProfilScreen({ navigation }) {
     texteAnnuler: { color: colors.textSecondary, fontWeight: '700' },
     texteValider: { color: colors.white, fontWeight: '700' },
 
+    // ===== FAVORIS =====
+    favorisContainer: {
+      marginBottom: spacing.xl,
+    },
+    favorisHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: spacing.sm,
+    },
+    favorisCompteur: {
+      fontSize: 12,
+      color: colors.primary,
+      fontWeight: '700',
+    },
+    favorisVide: {
+      backgroundColor: colors.card,
+      borderRadius: radius.md,
+      padding: spacing.lg,
+      alignItems: 'center',
+      borderWidth: 1,
+      borderStyle: 'dashed',
+      borderColor: colors.border,
+    },
+    favorisVideTexte: {
+      color: colors.textMuted,
+      fontSize: 13,
+      textAlign: 'center',
+      marginTop: spacing.sm,
+      lineHeight: 18,
+    },
+    carteFavori: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.card,
+      borderRadius: radius.md,
+      padding: spacing.sm,
+      marginBottom: spacing.sm,
+      ...shadow.sm,
+    },
+    imageFavori: {
+      width: 56,
+      height: 56,
+      borderRadius: radius.sm,
+      marginRight: spacing.md,
+      backgroundColor: colors.primaryLight,
+    },
+    imageFavoriPlaceholder: {
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    infosFavori: { flex: 1 },
+    nomFavori: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: colors.textPrimary,
+      marginBottom: 2,
+    },
+    detailFavori: {
+      fontSize: 11,
+      color: colors.textSecondary,
+    },
+
     boutonDeconnexion: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -164,12 +265,10 @@ export default function ProfilScreen({ navigation }) {
 
   async function sauvegarder() {
     const prenomNet = prenom.trim();
-
     if (!prenomNet) {
       Alert.alert('Prénom obligatoire', 'Kteb smitek mn fadlek.');
       return;
     }
-
     try {
       await mettreAJourProfil({
         prenom: prenomNet,
@@ -208,6 +307,76 @@ export default function ProfilScreen({ navigation }) {
         </View>
         <Text style={styles.nom}>{utilisateur?.prenom || 'Invité'}</Text>
         <Text style={styles.email}>{utilisateur?.email ?? 'email@exemple.com'}</Text>
+      </View>
+
+      {/* Stats rapides */}
+      <View style={styles.statsRapides}>
+        <View style={styles.statRapide}>
+          <Text style={styles.statRapideValeur}>{favoris.length}</Text>
+          <Text style={styles.statRapideLabel}>Favoris</Text>
+        </View>
+        <View style={styles.statRapideSeparateur} />
+        <View style={styles.statRapide}>
+          <Text style={styles.statRapideValeur}>{utilisateur?.objectifHebdo ?? 3}</Text>
+          <Text style={styles.statRapideLabel}>Objectif/sem.</Text>
+        </View>
+        <View style={styles.statRapideSeparateur} />
+        <View style={styles.statRapide}>
+          <Text style={styles.statRapideValeur}>🔥</Text>
+          <Text style={styles.statRapideLabel}>Actif</Text>
+        </View>
+      </View>
+
+      {/* ========== FAVORIS ========== */}
+      <View style={styles.favorisContainer}>
+        <View style={styles.favorisHeader}>
+          <Text style={styles.sectionTitre}>Mes favoris</Text>
+          {favoris.length > 0 && (
+            <Text style={styles.favorisCompteur}>
+              {favoris.length} exercice{favoris.length > 1 ? 's' : ''}
+            </Text>
+          )}
+        </View>
+
+        {exercicesFavoris.length === 0 ? (
+          <View style={styles.favorisVide}>
+            <Ionicons name="heart-outline" size={36} color={colors.textMuted} />
+            <Text style={styles.favorisVideTexte}>
+              Aucun favori pour le moment.{'\n'}
+              Clique sur le ❤️ d'un exercice pour l'ajouter ici.
+            </Text>
+          </View>
+        ) : (
+          exercicesFavoris.map((ex) => (
+            <TouchableOpacity
+              key={ex.id}
+              style={styles.carteFavori}
+              onPress={() => navigation.navigate('DetailExercice', { exercice: ex })}
+              activeOpacity={0.85}
+            >
+              {ex.imageUrl ? (
+                <Image
+                  source={{ uri: ex.imageUrl }}
+                  style={styles.imageFavori}
+                  resizeMode="cover"
+                />
+              ) : (
+                <View style={[styles.imageFavori, styles.imageFavoriPlaceholder]}>
+                  <Ionicons name="barbell" size={20} color={colors.primary} />
+                </View>
+              )}
+
+              <View style={styles.infosFavori}>
+                <Text style={styles.nomFavori} numberOfLines={1}>{ex.nom}</Text>
+                <Text style={styles.detailFavori} numberOfLines={1}>
+                  {ex.zone} · {ex.duree} min · {ex.niveau}
+                </Text>
+              </View>
+
+              <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+            </TouchableOpacity>
+          ))
+        )}
       </View>
 
       {/* Édition du profil */}

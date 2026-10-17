@@ -7,9 +7,10 @@ export function SeancesProvider({ children }) {
   const [seances, setSeances] = useState([]);
   const [exercices, setExercices] = useState([]);
   const [programmes, setProgrammes] = useState([]);
+  const [progressions, setProgressions] = useState({});
+  const [favoris, setFavoris] = useState([]);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState(null);
-  const [progressions, setProgressions] = useState({});
 
   // ============================================
   // CHARGEMENT INITIAL
@@ -19,10 +20,7 @@ export function SeancesProvider({ children }) {
       try {
         setErreur(null);
 
-        // Jbed l'token l'awwel
         const token = await getToken();
-
-        // Ila ma kaynch token → skip API
         if (!token) {
           console.log('>>> [SeancesContext] Pas de token, skip API');
           setChargement(false);
@@ -31,19 +29,17 @@ export function SeancesProvider({ children }) {
 
         console.log('>>> [SeancesContext] Début chargement');
 
-        // 1) Charger exercices + programmes en parallèle
+        // 1) Exercices + programmes
         const [exos, progs] = await Promise.all([
           api.getExercises(),
           api.getPrograms(),
         ]);
-
         setExercices(exos || []);
         setProgrammes(progs || []);
-
         console.log('>>> [SeancesContext] Exercices reçus:', exos?.length);
         console.log('>>> [SeancesContext] Programmes reçus:', progs?.length);
 
-        // 2) Charger les séances de l'historique (séparé pour ne pas casser le reste)
+        // 2) Séances
         try {
           const sess = await api.getSessions();
           setSeances(sess || []);
@@ -53,7 +49,7 @@ export function SeancesProvider({ children }) {
           setSeances([]);
         }
 
-        // 3) Charger la progression pour chaque programme
+        // 3) Progression programmes
         try {
           const resultats = await Promise.all(
             (progs || []).map(async (p) => {
@@ -61,21 +57,27 @@ export function SeancesProvider({ children }) {
                 const res = await api.getProgramProgress(p.id);
                 return { id: p.id, sessions: res.completedSessions || [] };
               } catch (e) {
-                console.log(`>>> Progression programme ${p.id} échoué:`, e.message);
                 return { id: p.id, sessions: [] };
               }
             })
           );
-
           const mapProgression = {};
-          resultats.forEach((r) => {
-            mapProgression[r.id] = r.sessions;
-          });
+          resultats.forEach((r) => { mapProgression[r.id] = r.sessions; });
           setProgressions(mapProgression);
           console.log('>>> [SeancesContext] Progressions chargées');
         } catch (e) {
           console.log('>>> [SeancesContext] Progressions échoué:', e.message);
           setProgressions({});
+        }
+
+        // 4) Favoris
+        try {
+          const favs = await api.getFavorites();
+          setFavoris((favs || []).map((f) => Number(f.id)));
+          console.log('>>> [SeancesContext] Favoris chargés:', favs?.length);
+        } catch (e) {
+          console.log('>>> [SeancesContext] Favoris échoué:', e.message);
+          setFavoris([]);
         }
       } catch (e) {
         console.log('>>> [SeancesContext] ERREUR:', e.message);
@@ -89,7 +91,7 @@ export function SeancesProvider({ children }) {
   }, []);
 
   // ============================================
-  // TERMINER UNE SÉANCE (historique)
+  // SÉANCES
   // ============================================
   async function terminerSeance(programme) {
     const tempId = `temp-${Date.now()}`;
@@ -115,9 +117,6 @@ export function SeancesProvider({ children }) {
     }
   }
 
-  // ============================================
-  // SUPPRIMER UNE SÉANCE
-  // ============================================
   async function supprimerSeance(id) {
     const sauvegarde = seances;
     setSeances((prev) => prev.filter((s) => s.id !== id));
@@ -129,9 +128,6 @@ export function SeancesProvider({ children }) {
     }
   }
 
-  // ============================================
-  // VIDER L'HISTORIQUE
-  // ============================================
   async function viderHistorique() {
     const ids = seances.map((s) => s.id);
     setSeances([]);
@@ -145,24 +141,19 @@ export function SeancesProvider({ children }) {
   }
 
   // ============================================
-  // 🆕 MARQUER UNE SESSION DE PROGRAMME COMME TERMINÉE
+  // PROGRESSION PROGRAMMES
   // ============================================
   async function marquerSessionTerminee(programId, sessionIndex) {
     try {
       await api.markSessionDone(programId, sessionIndex);
-
       setProgressions((prev) => {
-        const sessionsActuelles = prev[programId] || [];
-        // Éviter les doublons
-        if (sessionsActuelles.includes(sessionIndex)) {
-          return prev;
-        }
+        const actuelles = prev[programId] || [];
+        if (actuelles.includes(sessionIndex)) return prev;
         return {
           ...prev,
-          [programId]: [...sessionsActuelles, sessionIndex].sort((a, b) => a - b),
+          [programId]: [...actuelles, sessionIndex].sort((a, b) => a - b),
         };
       });
-
       console.log(`>>> Session ${sessionIndex} terminée pour programme ${programId}`);
     } catch (e) {
       console.log('>>> Erreur marquage session:', e.message);
@@ -170,44 +161,54 @@ export function SeancesProvider({ children }) {
     }
   }
 
-  // ============================================
-  // 🆕 RÉINITIALISER LA PROGRESSION D'UN PROGRAMME
-  // ============================================
   async function resetProgramme(programId) {
     try {
       await api.resetProgramProgress(programId);
-
-      setProgressions((prev) => ({
-        ...prev,
-        [programId]: [],
-      }));
-
-      console.log(`>>> Progression réinitialisée pour programme ${programId}`);
+      setProgressions((prev) => ({ ...prev, [programId]: [] }));
     } catch (e) {
       console.log('>>> Erreur reset programme:', e.message);
       throw e;
     }
   }
 
-  // ============================================
-  // 🆕 HELPERS (calculer l'état d'un programme)
-  // ============================================
   function getProgressionProgramme(programId, nombreTotal) {
     const sessions = progressions[programId] || [];
     const nombreTermines = sessions.length;
-    const pourcentage = nombreTotal > 0
-      ? (nombreTermines / nombreTotal) * 100
-      : 0;
+    const pourcentage = nombreTotal > 0 ? (nombreTermines / nombreTotal) * 100 : 0;
     const estTermine = nombreTotal > 0 && nombreTermines >= nombreTotal;
     const indexActuel = nombreTermines < nombreTotal ? nombreTermines : -1;
+    return { sessionsTerminees: sessions, nombreTermines, pourcentage, estTermine, indexActuel };
+  }
 
-    return {
-      sessionsTerminees: sessions,
-      nombreTermines,
-      pourcentage,
-      estTermine,
-      indexActuel,
-    };
+  // ============================================
+  // FAVORIS
+  // ============================================
+  function estFavori(exerciseId) {
+    return favoris.includes(Number(exerciseId));
+  }
+
+  async function toggleFavori(exerciseId) {
+    const id = Number(exerciseId);
+    const dejaFavori = favoris.includes(id);
+
+    // Optimistic update
+    setFavoris((prev) =>
+      dejaFavori ? prev.filter((f) => f !== id) : [...prev, id]
+    );
+
+    try {
+      if (dejaFavori) {
+        await api.removeFavorite(id);
+      } else {
+        await api.addFavorite(id);
+      }
+    } catch (e) {
+      // Rollback
+      setFavoris((prev) =>
+        dejaFavori ? [...prev, id] : prev.filter((f) => f !== id)
+      );
+      throw e;
+    }
   }
 
   // ============================================
@@ -216,22 +217,21 @@ export function SeancesProvider({ children }) {
   return (
     <SeancesContext.Provider
       value={{
-        // Données
         seances,
         exercices,
         programmes,
         progressions,
-        // État de chargement
+        favoris,
         chargement,
         erreur,
-        // Actions
         terminerSeance,
         supprimerSeance,
         viderHistorique,
         marquerSessionTerminee,
         resetProgramme,
-        // Helpers
         getProgressionProgramme,
+        estFavori,
+        toggleFavori,
       }}
     >
       {children}

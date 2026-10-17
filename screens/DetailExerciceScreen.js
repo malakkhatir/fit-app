@@ -6,6 +6,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAudioPlayer } from 'expo-audio';
 import { useTheme } from '../context/ThemeContext';
+import { useSeances } from '../context/SeancesContext';
 import { radius, spacing } from '../theme/colors';
 import CircularProgress from '../components/CircularProgress';
 import { SlideUpView, ScaleInView } from '../components/AnimatedWrapper';
@@ -34,12 +35,15 @@ const INSTRUCTIONS_PAR_CATEGORIE = {
 export default function DetailExerciceScreen({ route, navigation }) {
   const { exercice } = route.params;
   const { colors, isDark } = useTheme();
-  const [favori, setFavori] = useState(false);
+  const { estFavori, toggleFavori } = useSeances();
+
   const [secondes, setSecondes] = useState(exercice.duree * 60);
   const [enCours, setEnCours] = useState(false);
   const [dureeInitiale, setDureeInitiale] = useState(exercice.duree * 60);
   const [vibrationActive, setVibrationActive] = useState(true);
   const [sonActive, setSonActive] = useState(true);
+
+  const favori = estFavori(exercice.id);
 
   const player = useAudioPlayer(
     { uri: 'https://actions.google.com/sounds/v1/alarms/beep_short.ogg' }
@@ -101,8 +105,10 @@ export default function DetailExerciceScreen({ route, navigation }) {
   const styles = useMemo(() => StyleSheet.create({
     ecran: { flex: 1, backgroundColor: colors.background },
     imageContainer: {
-      height: 300, position: 'relative',
-      backgroundColor: colors.navy, overflow: 'hidden',
+      height: 300,
+      position: 'relative',
+      backgroundColor: colors.navy,
+      overflow: 'hidden',
     },
     imageBg: { width: '100%', height: '100%' },
     imagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
@@ -111,122 +117,183 @@ export default function DetailExerciceScreen({ route, navigation }) {
       backgroundColor: 'rgba(0,0,0,0.35)',
     },
     boutonRond: {
-      position: 'absolute', top: 50,
-      width: 42, height: 42, borderRadius: 21,
+      position: 'absolute',
+      top: 50,
+      width: 42,
+      height: 42,
+      borderRadius: 21,
       backgroundColor: 'rgba(0,0,0,0.5)',
-      alignItems: 'center', justifyContent: 'center',
+      alignItems: 'center',
+      justifyContent: 'center',
       zIndex: 10,
     },
     categorieBadge: {
-      position: 'absolute', bottom: 20, left: 20,
-      flexDirection: 'row', alignItems: 'center', gap: 6,
+      position: 'absolute',
+      bottom: 20,
+      left: 20,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
       backgroundColor: 'rgba(37, 99, 235, 0.9)',
-      paddingHorizontal: spacing.md, paddingVertical: 6,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 6,
       borderRadius: radius.round,
     },
     categorieBadgeTexte: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
     contenu: {
-      padding: spacing.lg, marginTop: -spacing.xl,
+      padding: spacing.lg,
+      marginTop: -spacing.xl,
       backgroundColor: colors.background,
-      borderTopLeftRadius: radius.xl, borderTopRightRadius: radius.xl,
+      borderTopLeftRadius: radius.xl,
+      borderTopRightRadius: radius.xl,
       paddingBottom: spacing.xxl,
     },
     titre: {
-      fontSize: 26, fontWeight: '900',
-      color: colors.textPrimary, marginBottom: spacing.md,
+      fontSize: 26,
+      fontWeight: '900',
+      color: colors.textPrimary,
+      marginBottom: spacing.md,
     },
     badges: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
     badge: {
-      paddingHorizontal: spacing.md, paddingVertical: 6,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 6,
       borderRadius: radius.round,
     },
     badgeTexte: { fontSize: 12, fontWeight: '700' },
     statsRow: {
-      flexDirection: 'row', alignItems: 'center',
-      backgroundColor: colors.card, borderRadius: radius.lg,
-      padding: spacing.md, marginBottom: spacing.lg,
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.card,
+      borderRadius: radius.lg,
+      padding: spacing.md,
+      marginBottom: spacing.lg,
     },
     statItem: {
-      flex: 1, flexDirection: 'row',
-      alignItems: 'center', justifyContent: 'center', gap: 6,
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
     },
     statSeparateur: { width: 1, height: 24, backgroundColor: colors.border },
     statValeur: { color: colors.textPrimary, fontWeight: '700', fontSize: 13 },
     section: {
-      fontSize: 17, fontWeight: '800', color: colors.textPrimary,
-      marginTop: spacing.md, marginBottom: spacing.sm,
+      fontSize: 17,
+      fontWeight: '800',
+      color: colors.textPrimary,
+      marginTop: spacing.md,
+      marginBottom: spacing.sm,
     },
     texte: { color: colors.textSecondary, lineHeight: 22, fontSize: 14 },
     etape: {
-      flexDirection: 'row', alignItems: 'flex-start',
+      flexDirection: 'row',
+      alignItems: 'flex-start',
       marginBottom: spacing.md,
     },
     numero: {
-      width: 26, height: 26, borderRadius: 13,
+      width: 26,
+      height: 26,
+      borderRadius: 13,
       backgroundColor: colors.primary,
-      alignItems: 'center', justifyContent: 'center',
-      marginRight: spacing.md, marginTop: 2,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: spacing.md,
+      marginTop: 2,
     },
     numeroTexte: { color: '#FFFFFF', fontWeight: '800', fontSize: 13 },
     etapeTexte: {
-      flex: 1, color: colors.textSecondary,
-      lineHeight: 22, fontSize: 14,
+      flex: 1,
+      color: colors.textSecondary,
+      lineHeight: 22,
+      fontSize: 14,
     },
     minuteur: {
-      alignItems: 'center', marginTop: spacing.xxl,
-      backgroundColor: colors.card, padding: spacing.xl,
+      alignItems: 'center',
+      marginTop: spacing.xxl,
+      backgroundColor: colors.card,
+      padding: spacing.xl,
       borderRadius: radius.lg,
     },
     minuteurHeader: {
-      flexDirection: 'row', width: '100%',
-      justifyContent: 'space-between', alignItems: 'center',
+      flexDirection: 'row',
+      width: '100%',
+      justifyContent: 'space-between',
+      alignItems: 'center',
       marginBottom: spacing.md,
     },
     minuteurLabel: {
-      fontSize: 13, color: colors.textMuted, fontWeight: '700',
-      letterSpacing: 1, textTransform: 'uppercase',
+      fontSize: 13,
+      color: colors.textMuted,
+      fontWeight: '700',
+      letterSpacing: 1,
+      textTransform: 'uppercase',
     },
     minuteurHeaderButtons: { flexDirection: 'row', gap: 8 },
     iconeButton: {
-      width: 36, height: 36, borderRadius: 18,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
       backgroundColor: colors.backgroundAlt,
-      alignItems: 'center', justifyContent: 'center',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     minuteurTemps: {
-      fontSize: 42, fontWeight: '900',
-      color: colors.textPrimary, fontVariant: ['tabular-nums'],
+      fontSize: 42,
+      fontWeight: '900',
+      color: colors.textPrimary,
+      fontVariant: ['tabular-nums'],
     },
     minuteurStatus: {
-      fontSize: 12, color: colors.textMuted,
-      marginTop: 4, fontWeight: '600',
+      fontSize: 12,
+      color: colors.textMuted,
+      marginTop: 4,
+      fontWeight: '600',
     },
     presets: {
-      flexDirection: 'row', gap: 8,
-      marginTop: spacing.lg, marginBottom: spacing.lg,
-      flexWrap: 'wrap', justifyContent: 'center',
+      flexDirection: 'row',
+      gap: 8,
+      marginTop: spacing.lg,
+      marginBottom: spacing.lg,
+      flexWrap: 'wrap',
+      justifyContent: 'center',
     },
     presetButton: {
-      paddingHorizontal: 14, paddingVertical: 8,
-      borderRadius: radius.round, backgroundColor: colors.backgroundAlt,
-      borderWidth: 1, borderColor: colors.border,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: radius.round,
+      backgroundColor: colors.backgroundAlt,
+      borderWidth: 1,
+      borderColor: colors.border,
     },
     presetTexte: {
-      fontSize: 12, fontWeight: '700', color: colors.textSecondary,
+      fontSize: 12,
+      fontWeight: '700',
+      color: colors.textSecondary,
     },
     minuteurActions: {
-      flexDirection: 'row', alignItems: 'center',
-      gap: spacing.md, width: '100%',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      width: '100%',
     },
     boutonReset: {
-      width: 56, height: 56, borderRadius: 28,
+      width: 56,
+      height: 56,
+      borderRadius: 28,
       backgroundColor: colors.backgroundAlt,
-      alignItems: 'center', justifyContent: 'center',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     boutonMinuteur: {
-      flex: 1, flexDirection: 'row', alignItems: 'center',
-      justifyContent: 'center', gap: spacing.sm,
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.sm,
       backgroundColor: colors.primary,
-      paddingVertical: 18, borderRadius: radius.md,
+      paddingVertical: 18,
+      borderRadius: radius.md,
     },
     boutonMinuteurPause: { backgroundColor: colors.warning },
     boutonMinuteurTexte: { color: '#FFFFFF', fontWeight: '700', fontSize: 16 },
@@ -253,9 +320,10 @@ export default function DetailExerciceScreen({ route, navigation }) {
             <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
           </TouchableOpacity>
 
+          {/* Bouton Favori — bddel m3a MySQL */}
           <TouchableOpacity
             style={[styles.boutonRond, { right: 20 }]}
-            onPress={() => setFavori((f) => !f)}
+            onPress={() => toggleFavori(exercice.id)}
           >
             <Ionicons
               name={favori ? 'heart' : 'heart-outline'}
@@ -282,18 +350,32 @@ export default function DetailExerciceScreen({ route, navigation }) {
                   {exercice.categorie}
                 </Text>
               </View>
-              <View style={[styles.badge, {
-                backgroundColor:
-                  exercice.niveau === 'Débutant' ? (isDark ? '#14532D' : '#DCFCE7') :
-                  exercice.niveau === 'Intermédiaire' ? (isDark ? '#78350F' : '#FEF3C7') :
-                  (isDark ? '#7F1D1D' : '#FEE2E2'),
-              }]}>
-                <Text style={[styles.badgeTexte, {
-                  color:
-                    exercice.niveau === 'Débutant' ? (isDark ? '#4ADE80' : '#22C55E') :
-                    exercice.niveau === 'Intermédiaire' ? (isDark ? '#FBBF24' : '#F59E0B') :
-                    (isDark ? '#F87171' : '#EF4444'),
-                }]}>
+              <View
+                style={[
+                  styles.badge,
+                  {
+                    backgroundColor:
+                      exercice.niveau === 'Débutant'
+                        ? isDark ? '#14532D' : '#DCFCE7'
+                        : exercice.niveau === 'Intermédiaire'
+                        ? isDark ? '#78350F' : '#FEF3C7'
+                        : isDark ? '#7F1D1D' : '#FEE2E2',
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.badgeTexte,
+                    {
+                      color:
+                        exercice.niveau === 'Débutant'
+                          ? isDark ? '#4ADE80' : '#22C55E'
+                          : exercice.niveau === 'Intermédiaire'
+                          ? isDark ? '#FBBF24' : '#F59E0B'
+                          : isDark ? '#F87171' : '#EF4444',
+                    },
+                  ]}
+                >
                   {exercice.niveau}
                 </Text>
               </View>
@@ -361,8 +443,10 @@ export default function DetailExerciceScreen({ route, navigation }) {
               </View>
 
               <CircularProgress
-                taille={220} epaisseur={16}
-                valeur={dureeInitiale - secondes} max={dureeInitiale}
+                taille={220}
+                epaisseur={16}
+                valeur={dureeInitiale - secondes}
+                max={dureeInitiale}
                 couleur={enCours ? colors.primary : colors.textMuted}
                 couleurFond={colors.primaryLight}
               >

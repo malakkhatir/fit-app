@@ -15,17 +15,19 @@ const ZONES = ['Toutes', 'Abdos', 'Fessiers', 'Cuisses', 'Hanches', 'Haut du cor
 const NIVEAUX = ['Tous', 'Débutant', 'Intermédiaire', 'Avancé'];
 
 export default function ExercicesScreen({ navigation }) {
-  const { exercices, chargement, erreur } = useSeances();
+  const { exercices, favoris, chargement, erreur } = useSeances();
   const { colors, isDark } = useTheme();
   const [recherche, setRecherche] = useState('');
   const [categorie, setCategorie] = useState('Tous');
   const [zone, setZone] = useState('Toutes');
   const [niveau, setNiveau] = useState('Tous');
+  const [voirFavoris, setVoirFavoris] = useState(false);
 
   useEffect(() => {
     console.log('=== [ExercicesScreen] ===');
     console.log('nombre exercices:', exercices.length);
-  }, [exercices]);
+    console.log('favoris:', favoris.length);
+  }, [exercices, favoris]);
 
   const listeFiltree = useMemo(() => {
     return exercices.filter((ex) => {
@@ -33,56 +35,97 @@ export default function ExercicesScreen({ navigation }) {
       const catOk = categorie === 'Tous' || ex.categorie === categorie;
       const zoneOk = zone === 'Toutes' || ex.zone === zone;
       const nivOk = niveau === 'Tous' || ex.niveau === niveau;
-      return nomOk && catOk && zoneOk && nivOk;
+      const favOk = !voirFavoris || favoris.includes(Number(ex.id));
+      return nomOk && catOk && zoneOk && nivOk && favOk;
     });
-  }, [exercices, recherche, categorie, zone, niveau]);
+  }, [exercices, recherche, categorie, zone, niveau, voirFavoris, favoris]);
 
   const styles = useMemo(() => StyleSheet.create({
     ecran: { flex: 1, backgroundColor: colors.background },
     header: {
-      paddingTop: 60, paddingHorizontal: spacing.lg, paddingBottom: spacing.sm,
+      paddingTop: 60,
+      paddingHorizontal: spacing.lg,
+      paddingBottom: spacing.sm,
     },
     titre: { fontSize: 28, fontWeight: '900', color: colors.textPrimary },
     compteur: { fontSize: 13, color: colors.textSecondary, marginTop: 4 },
     champRecherche: {
-      flexDirection: 'row', alignItems: 'center',
-      backgroundColor: colors.card, borderRadius: radius.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.card,
+      borderRadius: radius.md,
       paddingHorizontal: spacing.md,
-      marginHorizontal: spacing.lg, marginBottom: spacing.md,
-      borderWidth: 1, borderColor: colors.border,
+      marginHorizontal: spacing.lg,
+      marginBottom: spacing.md,
+      borderWidth: 1,
+      borderColor: colors.border,
     },
     inputRecherche: {
-      flex: 1, paddingVertical: 12, paddingHorizontal: spacing.sm,
-      color: colors.textPrimary, fontSize: 14,
+      flex: 1,
+      paddingVertical: 12,
+      paddingHorizontal: spacing.sm,
+      color: colors.textPrimary,
+      fontSize: 14,
+    },
+    boutonFavoris: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: radius.round,
+      alignSelf: 'flex-start',
+      marginHorizontal: spacing.lg,
+      marginBottom: spacing.md,
+      borderWidth: 1,
     },
     filtreTitre: {
-      fontSize: 11, fontWeight: '700', color: colors.textMuted,
-      textTransform: 'uppercase', letterSpacing: 0.5,
-      paddingHorizontal: spacing.lg, marginBottom: 6, marginTop: 4,
+      fontSize: 11,
+      fontWeight: '700',
+      color: colors.textMuted,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+      paddingHorizontal: spacing.lg,
+      marginBottom: 6,
+      marginTop: 4,
     },
     filtresContainer: {
-      flexDirection: 'row', flexWrap: 'wrap',
-      paddingHorizontal: spacing.lg, gap: spacing.sm, marginBottom: spacing.sm,
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      paddingHorizontal: spacing.lg,
+      gap: spacing.sm,
+      marginBottom: spacing.sm,
     },
     filtre: {
-      paddingHorizontal: 14, paddingVertical: 8,
-      borderRadius: radius.round, backgroundColor: colors.card,
-      borderWidth: 1, borderColor: colors.border,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: radius.round,
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
     },
     filtreActif: { backgroundColor: colors.primary, borderColor: colors.primary },
     filtreTexte: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
     filtreTexteActif: { color: colors.white },
     resultats: {
-      fontSize: 12, color: colors.textMuted,
-      paddingHorizontal: spacing.lg, marginBottom: spacing.sm, fontWeight: '600',
+      fontSize: 12,
+      color: colors.textMuted,
+      paddingHorizontal: spacing.lg,
+      marginBottom: spacing.sm,
+      fontWeight: '600',
     },
     liste: { paddingHorizontal: spacing.lg, paddingBottom: 30 },
     vide: {
-      alignItems: 'center', paddingVertical: 60, paddingHorizontal: spacing.xl,
+      alignItems: 'center',
+      paddingVertical: 60,
+      paddingHorizontal: spacing.xl,
     },
     videTexte: {
-      color: colors.textSecondary, marginTop: spacing.md,
-      fontSize: 14, textAlign: 'center', fontWeight: '600',
+      color: colors.textSecondary,
+      marginTop: spacing.md,
+      fontSize: 14,
+      textAlign: 'center',
+      fontWeight: '600',
     },
   }), [colors]);
 
@@ -100,6 +143,7 @@ export default function ExercicesScreen({ navigation }) {
         </View>
       </FadeInView>
 
+      {/* Recherche */}
       <View style={styles.champRecherche}>
         <Ionicons name="search" size={20} color={colors.textMuted} />
         <TextInput
@@ -116,6 +160,35 @@ export default function ExercicesScreen({ navigation }) {
         )}
       </View>
 
+      {/* Bouton Favoris */}
+      <TouchableOpacity
+        style={[
+          styles.boutonFavoris,
+          {
+            backgroundColor: voirFavoris ? colors.danger : colors.card,
+            borderColor: voirFavoris ? colors.danger : colors.border,
+          },
+        ]}
+        onPress={() => setVoirFavoris((v) => !v)}
+        activeOpacity={0.8}
+      >
+        <Ionicons
+          name={voirFavoris ? 'heart' : 'heart-outline'}
+          size={16}
+          color={voirFavoris ? '#FFFFFF' : colors.textSecondary}
+        />
+        <Text
+          style={{
+            fontSize: 13,
+            fontWeight: '700',
+            color: voirFavoris ? '#FFFFFF' : colors.textSecondary,
+          }}
+        >
+          Favoris ({favoris.length})
+        </Text>
+      </TouchableOpacity>
+
+      {/* Filtres Catégorie */}
       <Text style={styles.filtreTitre}>Catégorie</Text>
       <View style={styles.filtresContainer}>
         {CATEGORIES.map((cat) => {
@@ -135,6 +208,7 @@ export default function ExercicesScreen({ navigation }) {
         })}
       </View>
 
+      {/* Filtres Zone */}
       <Text style={styles.filtreTitre}>Zone du corps</Text>
       <View style={styles.filtresContainer}>
         {ZONES.map((z) => {
@@ -154,6 +228,7 @@ export default function ExercicesScreen({ navigation }) {
         })}
       </View>
 
+      {/* Filtres Niveau */}
       <Text style={styles.filtreTitre}>Niveau</Text>
       <View style={styles.filtresContainer}>
         {NIVEAUX.map((n) => {
@@ -206,8 +281,14 @@ export default function ExercicesScreen({ navigation }) {
               </>
             ) : (
               <>
-                <Ionicons name="search-outline" size={48} color={colors.textMuted} />
-                <Text style={styles.videTexte}>Aucun exercice trouvé.</Text>
+                <Ionicons
+                  name={voirFavoris ? 'heart-outline' : 'search-outline'}
+                  size={48}
+                  color={colors.textMuted}
+                />
+                <Text style={styles.videTexte}>
+                  {voirFavoris ? 'Aucun favori pour le moment.' : 'Aucun exercice trouvé.'}
+                </Text>
               </>
             )}
           </View>

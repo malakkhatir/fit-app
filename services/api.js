@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ⚠️ REMPLACE par ton IP locale (trouvée avec `ipconfig`)
-export const API_URL = 'http://192.168.11.204/fitapp-backend/api';
+export const API_URL = 'http://192.168.51.52/fitapp-backend/api';
 
 const CLE_TOKEN = 'fitapp_token';
 const CLE_USER = 'fitapp_user';
@@ -85,4 +85,7 @@ export const api = {
       method: 'DELETE',
       auth: true,
     }),
+    getFavorites:() => request('/favorites.php',{ auth: true }),
+    addFavorite:(id) => request('/favorites.php',{ method: 'POST',   body: { exerciseId: id }, auth: true }),
+    removeFavorite:(id) => request(`/favorites.php?exerciseId=${id}`, { method: 'DELETE', auth: true }),
 };
