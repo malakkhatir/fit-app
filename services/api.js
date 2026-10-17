@@ -64,8 +64,7 @@ export const api = {
   getExercises: (niveau) =>
     request(`/exercises.php${niveau ? `?niveau=${encodeURIComponent(niveau)}` : ''}`),
   getPrograms: (niveau) =>
-    request(`/programs.php${niveau ? `?niveau=${encodeURIComponent(niveau)}` : ''}`),
-
+    request(`/programs.php${niveau ? `?niveau=${encodeURIComponent(niveau)}` : ''}`, { auth: true }),
   getSessions:   ()   => request('/sessions.php',          { auth: true }),
   addSession:    (p)  => request('/sessions.php',          { method: 'POST',   body: p, auth: true }),
   deleteSession: (id) => request(`/sessions.php?id=${id}`, { method: 'DELETE', auth: true }),
@@ -123,4 +122,8 @@ export const api = {
     
     return data;
   },
+    // Custom Programs
+  createCustomProgram: (payload) => request('/custom-program.php', { method: 'POST', body: payload, auth: true }),
+  deleteCustomProgram: (id) => request(`/custom-program.php?id=${id}`, { method: 'DELETE', auth: true }),
+    updateCustomProgram: (id, payload) => request(`/custom-program.php?id=${id}`, { method: 'PUT', body: payload, auth: true }),
 };

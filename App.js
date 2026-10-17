@@ -6,6 +6,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SeancesProvider } from './context/SeancesContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { LanguageProvider } from './context/LanguageContext';
 
 import SplashScreen from './screens/SplashScreen';
 import AuthStack from './navigation/AuthStack';
@@ -14,6 +15,9 @@ import DetailExerciceScreen from './screens/DetailExerciceScreen';
 import DetailProgrammeScreen from './screens/DetailProgrammeScreen';
 import ProgressionScreen from './screens/ProgressionScreen';
 import HistoriqueScreen from './screens/HistoriqueScreen';
+import CreateProgrammeScreen from './screens/CreateProgrammeScreen';
+import AideScreen from './screens/AideScreen';
+import AProposScreen from './screens/AProposScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -25,7 +29,6 @@ function LoadingScreen() {
   );
 }
 
-// ✅ CONNECTÉ → SeancesProvider khddam hna bo7do
 function AppConnecte() {
   return (
     <SeancesProvider>
@@ -35,12 +38,14 @@ function AppConnecte() {
         <Stack.Screen name="DetailProgramme" component={DetailProgrammeScreen} />
         <Stack.Screen name="Progression" component={ProgressionScreen} />
         <Stack.Screen name="Historique" component={HistoriqueScreen} />
+        <Stack.Screen name="CreateProgramme" component={CreateProgrammeScreen} />
+        <Stack.Screen name="Aide" component={AideScreen} />
+        <Stack.Screen name="APropos" component={AProposScreen} />
       </Stack.Navigator>
     </SeancesProvider>
   );
 }
 
-// ❌ PAS CONNECTÉ → BLA SeancesProvider
 function AppNonConnecte() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -60,12 +65,14 @@ function RootStack() {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <NavigationContainer>
-          <RootStack />
-        </NavigationContainer>
-      </AuthProvider>
-    </ThemeProvider>
+    <AuthProvider>
+      <ThemeProvider>
+        <LanguageProvider>
+          <NavigationContainer>
+            <RootStack />
+          </NavigationContainer>
+        </LanguageProvider>
+      </ThemeProvider>
+    </AuthProvider>
   );
 }

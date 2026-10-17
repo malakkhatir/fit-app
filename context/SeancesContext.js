@@ -125,8 +125,6 @@ export function SeancesProvider({ children }) {
         minutes: programme.duree,
       });
       setSeances((prev) => prev.map((s) => (s.id === tempId ? reelle : s)));
-
-      // Recharge badges en arrière-plan
       rechargerBadges().catch(() => {});
     } catch (e) {
       setSeances((prev) => prev.filter((s) => s.id !== tempId));
@@ -149,8 +147,14 @@ export function SeancesProvider({ children }) {
   async function viderHistorique() {
     const ids = seances.map((s) => s.id);
     setSeances([]);
+    setProgressions({}); // 🆕 Nmse7o l'progressions (l'khadar)
+    
     try {
       await Promise.all(ids.map((id) => api.deleteSession(id)));
+      
+      // 🆕 Nmse7o l'progressions dial ga3 les programmes f l'backend
+      await Promise.all(programmes.map((p) => api.resetProgramProgress(p.id)));
+      
       rechargerBadges().catch(() => {});
     } catch (e) {
       const serveur = await api.getSessions();
@@ -220,7 +224,6 @@ export function SeancesProvider({ children }) {
       } else {
         await api.addFavorite(id);
       }
-      // Recharge badges (favoris affectent "Collectionneur")
       rechargerBadges().catch(() => {});
     } catch (e) {
       setFavoris((prev) =>
@@ -241,6 +244,43 @@ export function SeancesProvider({ children }) {
       return data;
     } catch (e) {
       console.log('>>> Erreur rechargement badges:', e.message);
+      throw e;
+    }
+  }
+
+  // ============================================
+  // PROGRAMMES PERSONNALISÉS (NOUVEAU)
+  // ============================================
+  async function ajouterProgrammePerso(titre, exercicesIds) {
+    try {
+      const result = await api.createCustomProgram({ titre, exercicesIds });
+      // Recharge les programmes bach yban l'jdid
+      const progs = await api.getPrograms();
+      setProgrammes(progs || []);
+      return result;
+    } catch (e) {
+      console.log('>>> Erreur ajout programme perso:', e.message);
+      throw e;
+    }
+  }
+    async function modifierProgrammePerso(id, titre, exercicesIds) {
+    try {
+      await api.updateCustomProgram(id, { titre, exercicesIds });
+      const progs = await api.getPrograms();
+      setProgrammes(progs || []);
+      return { success: true };
+    } catch (e) {
+      console.log('>>> Erreur modif programme perso:', e.message);
+      throw e;
+    }
+  }
+
+  async function supprimerProgrammePerso(id) {
+    try {
+      await api.deleteCustomProgram(id);
+      setProgrammes((prev) => prev.filter((p) => p.id !== id));
+    } catch (e) {
+      console.log('>>> Erreur suppression programme perso:', e.message);
       throw e;
     }
   }
@@ -269,6 +309,9 @@ export function SeancesProvider({ children }) {
         estFavori,
         toggleFavori,
         rechargerBadges,
+        ajouterProgrammePerso,     
+        supprimerProgrammePerso,
+        modifierProgrammePerso,     
       }}
     >
       {children}

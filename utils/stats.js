@@ -1,7 +1,7 @@
 export function debutDeSemaine(reference = new Date()) {
   const date = new Date(reference);
   date.setHours(0, 0, 0, 0);
-  const jour = (date.getDay() + 6) % 7;
+  const jour = (date.getDay() + 6) % 7; // 0 = Lundi ... 6 = Dimanche
   date.setDate(date.getDate() - jour);
   return date;
 }
@@ -12,13 +12,18 @@ export function seancesDeLaSemaine(seances, reference = new Date()) {
 }
 
 export function calculerStatistiques(seances, objectifHebdo = 3) {
-  const nombreSeances = seances.length;
+  const nombreSeances = seances.length; // L'historique kaml (machi dial simana)
   const minutesTotales = seances.reduce((t, s) => t + s.minutes, 0);
 
   const semaine = seancesDeLaSemaine(seances);
-  const seancesSemaine = semaine.length;
+  
+  // 🆕 7seb l'ayam l'uniques f had l'semaine
+  const joursUniques = new Set(
+    semaine.map((s) => new Date(s.date).toDateString())
+  );
+  const seancesSemaine = joursUniques.size; 
+  
   const minutesSemaine = semaine.reduce((t, s) => t + s.minutes, 0);
-
   const progression = Math.min(seancesSemaine / objectifHebdo, 1) * 100;
 
   return { nombreSeances, minutesTotales, seancesSemaine, minutesSemaine, progression };
@@ -38,7 +43,6 @@ export function formaterHeure(iso) {
   return `${h}:${m}`;
 }
 
-// Regroupe les séances par semaine (pour le graphique)
 export function seancesParSemaine(seances, nombreSemaines = 5) {
   const semaines = [];
   const maintenant = new Date();
@@ -55,9 +59,14 @@ export function seancesParSemaine(seances, nombreSemaines = 5) {
       return d >= debut && d < fin;
     });
 
+    // 🆕 7seb l'ayam l'uniques f kol simana (dial l'Graphique)
+    const joursUniques = new Set(
+      dansSemaine.map((s) => new Date(s.date).toDateString())
+    );
+
     semaines.push({
       label: `S${nombreSemaines - i}`,
-      count: dansSemaine.length,
+      count: joursUniques.size, // 🆕 Hna wla kay7seb l'ayam
       minutes: dansSemaine.reduce((t, s) => t + s.minutes, 0),
     });
   }

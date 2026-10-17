@@ -81,17 +81,10 @@ export function AuthProvider({ children }) {
   // ============================================
   // MISE À JOUR PROFIL (prenom + objectif)
   // ============================================
-  async function mettreAJourProfil({ prenom, objectifHebdo, poids, taille, age, sexe }) {
-    if (!prenom || prenom.trim() === '') {
-      throw new Error('Prénom obligatoire');
-    }
+  async function mettreAJourProfil({ prenom, objectifHebdo, poids, targetWeight, taille, age, sexe }) {
+    if (!prenom || prenom.trim() === '') throw new Error('Prénom obligatoire');
     const user = await api.updateProfile({ 
-      prenom: prenom.trim(), 
-      objectifHebdo,
-      poids,
-      taille,
-      age,
-      sexe
+      prenom: prenom.trim(), objectifHebdo, poids, targetWeight, taille, age, sexe 
     });
     await AsyncStorage.setItem(CLE_USER, JSON.stringify(user));
     setUtilisateur(user);

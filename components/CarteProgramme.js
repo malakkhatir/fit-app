@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
-import { radius, spacing, shadow } from '../theme/colors';
+import { radius, spacing } from '../theme/colors';
 
 export default function CarteProgramme({ programme, onPress }) {
   const { colors, isDark } = useTheme();
@@ -39,7 +39,11 @@ export default function CarteProgramme({ programme, onPress }) {
       padding: spacing.sm,
       marginBottom: spacing.md,
       overflow: 'hidden',
-      ...shadow.sm,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 2,
+      elevation: 1,
     },
     imageContainer: { position: 'relative', marginRight: spacing.md },
     image: { width: 90, height: 90, borderRadius: radius.md },
@@ -52,6 +56,22 @@ export default function CarteProgramme({ programme, onPress }) {
       borderRadius: radius.sm,
     },
     badgeNiveauTexte: { fontSize: 9, fontWeight: '800' },
+    
+    // 🆕 Badge "Personnalisé"
+    badgePerso: {
+      position: 'absolute',
+      top: 4,
+      left: 4,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
+      backgroundColor: '#F59E0B',
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: radius.sm,
+    },
+    badgePersoTexte: { color: '#FFFFFF', fontSize: 9, fontWeight: '800' },
+
     infos: { flex: 1, paddingRight: spacing.sm },
     titre: {
       fontSize: 16,
@@ -61,7 +81,7 @@ export default function CarteProgramme({ programme, onPress }) {
     },
     detail: { fontSize: 12, color: colors.textSecondary, marginBottom: 6 },
     description: { fontSize: 11, color: colors.textMuted, lineHeight: 15 },
-  }), [colors]);
+  }), [colors, isDark]);
 
   return (
     <TouchableOpacity style={styles.carte} onPress={onPress} activeOpacity={0.85}>
@@ -73,6 +93,15 @@ export default function CarteProgramme({ programme, onPress }) {
             <Ionicons name="barbell" size={30} color={colors.primary} />
           </View>
         )}
+
+        {/* 🆕 Badge "Perso" */}
+        {programme.isCustom && (
+          <View style={styles.badgePerso}>
+            <Ionicons name="star" size={10} color="#FFFFFF" />
+            <Text style={styles.badgePersoTexte}>Perso</Text>
+          </View>
+        )}
+
         <View style={[styles.badgeNiveau, { backgroundColor: niv.fond }]}>
           <Text style={[styles.badgeNiveauTexte, { color: niv.couleur }]}>
             {programme.niveau}
