@@ -22,6 +22,32 @@ export default function AccueilScreen({ navigation }) {
   const stats = calculerStatistiques(seances, objectif);
   const populaires = exercices.slice(0, 2);
 
+  // ============================================
+  // CALCULS SANTÉ
+  // ============================================
+  const poids = utilisateur?.poids ?? 70;
+  const taille = utilisateur?.taille ?? 170;
+  
+  // IMC = Poids / (Taille en mètres)²
+  const imc = (poids / Math.pow(taille / 100, 2)).toFixed(1);
+  
+  let imcStatut = 'Normal';
+  let imcCouleur = isDark ? '#4ADE80' : '#22C55E';
+  let imcFond = isDark ? '#14532D' : '#DCFCE7';
+  
+  if (imc < 18.5) {
+    imcStatut = 'Maigreur';
+    imcCouleur = colors.warning;
+    imcFond = isDark ? '#78350F' : '#FEF3C7';
+  } else if (imc >= 25) {
+    imcStatut = 'Surpoids';
+    imcCouleur = colors.danger;
+    imcFond = isDark ? '#7F1D1D' : '#FEE2E2';
+  }
+
+  // Calories = Minutes * MET (6.5) * Poids / 60
+  const calories = Math.round((stats.minutesTotales * 6.5 * poids) / 60);
+
   const styles = useMemo(() => StyleSheet.create({
     ecran: { flex: 1, backgroundColor: colors.background },
     contenu: { padding: spacing.lg, paddingTop: 60, paddingBottom: 40 },
@@ -48,12 +74,9 @@ export default function AccueilScreen({ navigation }) {
       backgroundColor: colors.primaryLight,
       alignItems: 'center',
       justifyContent: 'center',
-      overflow: 'hidden', // ⚠️ Zidtha bach l'tswira t9ta3 f l'cercle
+      overflow: 'hidden',
     },
-    avatarImage: {
-      width: '100%',
-      height: '100%',
-    },
+    avatarImage: { width: '100%', height: '100%' },
 
     carteObjectif: {
       flexDirection: 'row',
@@ -97,6 +120,50 @@ export default function AccueilScreen({ navigation }) {
     },
     cercleTexte: { color: colors.white, fontWeight: '800', fontSize: 15 },
 
+    // ===== SANTÉ =====
+    sectionSante: {
+      flexDirection: 'row',
+      gap: spacing.sm,
+      marginBottom: spacing.xl,
+    },
+    santeCard: {
+      flex: 1,
+      backgroundColor: colors.card,
+      borderRadius: radius.lg,
+      padding: spacing.md,
+      alignItems: 'center',
+      ...shadow.sm,
+    },
+    santeIcone: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: colors.backgroundAlt,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: spacing.sm,
+    },
+    santeValeur: {
+      fontSize: 18,
+      fontWeight: '900',
+      color: colors.textPrimary,
+    },
+    santeLabel: {
+      fontSize: 10,
+      color: colors.textSecondary,
+      marginTop: 4,
+      fontWeight: '600',
+      textAlign: 'center',
+    },
+    santeBadge: {
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 4,
+      marginTop: 4,
+    },
+    santeBadgeTexte: { fontSize: 9, fontWeight: '700' },
+
+    // ===== CARTES RACCOURCIS =====
     grille: { gap: spacing.md, marginBottom: spacing.xl },
     rangee: { flexDirection: 'row', gap: spacing.md },
     carteAction: {
@@ -143,7 +210,7 @@ export default function AccueilScreen({ navigation }) {
       fontWeight: '700',
     },
     grilleExercices: { flexDirection: 'row', gap: spacing.md },
-  }), [colors]);
+  }), [colors, isDark, imcCouleur, imcFond]);
 
   return (
     <ScrollView
@@ -163,7 +230,6 @@ export default function AccueilScreen({ navigation }) {
             <Text style={styles.sousTitre}>Prêt à atteindre tes objectifs ?</Text>
           </View>
           
-          {/* Avatar f l'korn (m3a Photo ila kayna) */}
           <TouchableOpacity
             style={styles.avatar}
             onPress={() => navigation.navigate('Profil')}
@@ -181,7 +247,7 @@ export default function AccueilScreen({ navigation }) {
         </View>
       </FadeInView>
 
-      {/* Carte objectif b ScaleIn */}
+      {/* Carte objectif */}
       <ScaleInView delay={100}>
         <View style={styles.carteObjectif}>
           <View style={{ flex: 1 }}>
@@ -200,6 +266,43 @@ export default function AccueilScreen({ navigation }) {
           </View>
         </View>
       </ScaleInView>
+
+      {/* ============ SECTION SANTÉ ============ */}
+      <SlideUpView delay={150}>
+        <View style={styles.sectionSante}>
+          {/* Poids */}
+          <View style={styles.santeCard}>
+            <View style={styles.santeIcone}>
+              <Ionicons name="scale-outline" size={18} color={colors.primary} />
+            </View>
+            <Text style={styles.santeValeur}>{poids} kg</Text>
+            <Text style={styles.santeLabel}>Poids</Text>
+          </View>
+
+          {/* IMC */}
+          <View style={styles.santeCard}>
+            <View style={styles.santeIcone}>
+              <Ionicons name="fitness-outline" size={18} color="#F59E0B" />
+            </View>
+            <Text style={styles.santeValeur}>{imc}</Text>
+            <Text style={styles.santeLabel}>IMC</Text>
+            <View style={[styles.santeBadge, { backgroundColor: imcFond }]}>
+              <Text style={[styles.santeBadgeTexte, { color: imcCouleur }]}>
+                {imcStatut}
+              </Text>
+            </View>
+          </View>
+
+          {/* Calories */}
+          <View style={styles.santeCard}>
+            <View style={styles.santeIcone}>
+              <Ionicons name="flame-outline" size={18} color="#EF4444" />
+            </View>
+            <Text style={styles.santeValeur}>{calories}</Text>
+            <Text style={styles.santeLabel}>Calories</Text>
+          </View>
+        </View>
+      </SlideUpView>
 
       {/* 4 cartes b SlideUp */}
       <View style={styles.grille}>
